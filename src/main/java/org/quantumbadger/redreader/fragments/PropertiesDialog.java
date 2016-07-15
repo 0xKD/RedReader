@@ -44,7 +44,7 @@ public abstract class PropertiesDialog extends AppCompatDialogFragment {
 
 	@NonNull
 	@Override
-	public final Dialog onCreateDialog(final Bundle savedInstanceState) {
+	public Dialog onCreateDialog(final Bundle savedInstanceState) {
 		super.onCreateDialog(savedInstanceState);
 
 		if(alreadyCreated) return getDialog();
