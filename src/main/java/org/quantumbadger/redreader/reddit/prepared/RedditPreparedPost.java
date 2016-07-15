@@ -27,7 +27,6 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.net.Uri;
-import android.os.Environment;
 import android.preference.PreferenceManager;
 import android.support.v7.app.AppCompatActivity;
 import android.text.ClipboardManager;
@@ -57,9 +56,8 @@ import org.quantumbadger.redreader.common.LinkHandler;
 import org.quantumbadger.redreader.common.PrefsUtility;
 import org.quantumbadger.redreader.common.RRError;
 import org.quantumbadger.redreader.common.RRTime;
+import org.quantumbadger.redreader.image.ImageSaver;
 import org.quantumbadger.redreader.fragments.PostPropertiesDialog;
-import org.quantumbadger.redreader.image.GetImageInfoListener;
-import org.quantumbadger.redreader.image.ImageInfo;
 import org.quantumbadger.redreader.image.ThumbnailScaler;
 import org.quantumbadger.redreader.reddit.APIResponseHandler;
 import org.quantumbadger.redreader.reddit.RedditAPI;
@@ -70,9 +68,6 @@ import org.quantumbadger.redreader.views.RedditPostView;
 import org.quantumbadger.redreader.views.bezelmenu.SideToolbarOverlay;
 import org.quantumbadger.redreader.views.bezelmenu.VerticalToolbar;
 
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStream;
 import java.net.URI;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -333,112 +328,13 @@ public final class RedditPreparedPost {
 			}
 
 			case SAVE_IMAGE: {
-
-				((BaseActivity)activity).requestPermissionWithCallback(Manifest.permission.WRITE_EXTERNAL_STORAGE, new BaseActivity.PermissionCallback() {
+				((BaseActivity) activity).requestPermissionWithCallback(Manifest.permission.WRITE_EXTERNAL_STORAGE, new BaseActivity.PermissionCallback() {
 					@Override
 					public void onPermissionGranted() {
-
 						final RedditAccount anon = RedditAccountManager.getAnon();
-
-						LinkHandler.getImageInfo(activity, post.src.getUrl(), Constants.Priority.IMAGE_VIEW, 0, new GetImageInfoListener() {
-
-							@Override
-							public void onFailure(final @CacheRequest.RequestFailureType int type, final Throwable t, final Integer status, final String readableMessage) {
-								final RRError error = General.getGeneralErrorForFailure(activity, type, t, status, post.src.getUrl());
-								General.showResultDialog(activity, error);
-							}
-
-							@Override
-							public void onSuccess(final ImageInfo info) {
-
-								CacheManager.getInstance(activity).makeRequest(new CacheRequest(General.uriFromString(info.urlOriginal), anon, null,
-									Constants.Priority.IMAGE_VIEW, 0, CacheRequest.DOWNLOAD_IF_NECESSARY,
-									Constants.FileType.IMAGE, CacheRequest.DOWNLOAD_QUEUE_IMMEDIATE, false, false, activity) {
-
-									@Override
-									protected void onCallbackException(Throwable t) {
-										BugReportActivity.handleGlobalError(context, t);
-									}
-
-									@Override
-									protected void onDownloadNecessary() {
-										General.quickToast(context, R.string.download_downloading);
-									}
-
-									@Override
-									protected void onDownloadStarted() {
-									}
-
-									@Override
-									protected void onFailure(
-												@CacheRequest.RequestFailureType int type,
-												Throwable t,
-												Integer status,
-												String readableMessage) {
-
-										final RRError error = General.getGeneralErrorForFailure(context, type, t, status, url.toString());
-										General.showResultDialog(activity, error);
-									}
-
-									@Override
-									protected void onProgress(
-											boolean authorizationInProgress,
-											long bytesRead,
-											long totalBytes) {
-									}
-
-									@Override
-									protected void onSuccess(
-											CacheManager.ReadableCacheFile cacheFile,
-											long timestamp,
-											UUID session,
-											boolean fromCache,
-											String mimetype) {
-
-										String filename = General.filenameFromString(info.urlOriginal);
-										File dst = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), filename);
-
-										if(dst.exists()) {
-											int count = 0;
-
-											while(dst.exists()) {
-												count++;
-												dst = new File(
-													Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
-													count + "_" + filename.substring(1));
-											}
-										}
-
-										try {
-											final InputStream cacheFileInputStream = cacheFile.getInputStream();
-
-											if(cacheFileInputStream == null) {
-												notifyFailure(CacheRequest.REQUEST_FAILURE_CACHE_MISS, null, null, "Could not find cached image");
-												return;
-											}
-
-											General.copyFile(cacheFileInputStream, dst);
-
-										} catch(IOException e) {
-											notifyFailure(CacheRequest.REQUEST_FAILURE_STORAGE, e, null, "Could not copy file");
-											return;
-										}
-
-										activity.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE,
-											Uri.parse("file://" + dst.getAbsolutePath()))
-										);
-
-										General.quickToast(context, context.getString(R.string.action_save_image_success) + " " + dst.getAbsolutePath());
-									}
-								});
-
-							}
-
-							@Override
-							public void onNotAnImage() {
-								General.quickToast(activity, R.string.selected_link_is_not_image);
-							}
-						});
+						LinkHandler.getImageInfo(activity, post.src.getUrl(),
+								Constants.Priority.IMAGE_VIEW, 0,
+								ImageSaver.newImageSaverInfoListener(activity, anon, post.src.getUrl()));
 					}
 
 					@Override
